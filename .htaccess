@@ -1,0 +1,15 @@
+# SentiGuard MBG - Root .htaccess
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Jangan rewrite jika file atau folder fisik ada di root (seperti api/, uploads/, dll.)
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Akses langsung ke root dialihkan ke public/
+    RewriteRule ^$ public/index.php [L]
+
+    # Meneruskan seluruh request lainnya ke folder public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

@@ -1,0 +1,12 @@
+# SentiGuard MBG - Public Directory .htaccess
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Izinkan file dan folder fisik yang ada (CSS, JS, gambar, file PHP)
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Rewrite rute SPA ke index.php
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>

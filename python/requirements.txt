@@ -1,0 +1,8 @@
+Flask
+Flask-Cors
+pandas
+Sastrawi
+scikit-learn
+joblib
+selenium
+undetected-chromedriver
