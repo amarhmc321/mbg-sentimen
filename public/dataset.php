@@ -103,8 +103,9 @@ const params = new URLSearchParams(window.location.search);
 const datasetId = params.get("id");
 
 if (!datasetId) {
-    alert("Dataset tidak ditemukan.");
-    window.location.href = "upload.php";
+    $("#datasetInfo").html("<div class='alert alert-warning mb-0'>Dataset ID tidak ditemukan di URL. Silakan pilih dataset dari halaman <a href='upload.php' data-spa='true'>Upload Dataset</a> atau <a href='index.php' data-spa='true'>Dashboard</a>.</div>");
+    $("#commentTableBody").html("<tr><td colspan='4' class='text-center text-muted py-3'>Tidak ada dataset yang dipilih.</td></tr>");
+    return;
 }
 
 $("#btnExport").attr("href", "../api/dataset.php?action=export&dataset_id=" + datasetId);
@@ -185,7 +186,7 @@ function loadComments() {
 
 loadComments();
 
-$(document).on("change", ".label-select", function () {
+$(document).off("change.mbgLabel", ".label-select").on("change.mbgLabel", ".label-select", function () {
     let commentId = $(this).data("id");
     let sentiment = $(this).val();
 

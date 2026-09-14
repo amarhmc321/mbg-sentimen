@@ -1,7 +1,8 @@
 /**
  * SentiGuard MBG - SPA Client-side Router (router.js)
  * Mengelola navigasi halaman dinamis tanpa reload penuh (Single Page Application)
- * Mendukung History API (pushState & popstate), indikator loading, dan eksekusi skrip dinamis.
+ * Mendukung History API (pushState & popstate), sinkronisasi URL search params,
+ * indikator loading, dan eksekusi skrip dinamis terisolasi (IIFE).
  */
 
 (function () {
@@ -18,17 +19,17 @@
             height: 3px;
             background: linear-gradient(90deg, #0d6efd, #0dcaf0);
             z-index: 99999;
-            transition: width 0.3s ease, opacity 0.4s ease;
+            transition: width 0.25s ease, opacity 0.3s ease;
             box-shadow: 0 0 10px rgba(13, 110, 253, 0.7);
+            pointer-events: none;
         }
         .spa-fade-enter {
-            opacity: 0;
-            transform: translateY(6px);
-            transition: opacity 0.25s ease, transform 0.25s ease;
+            opacity: 0.15;
+            transition: opacity 0.2s ease-in-out;
         }
         .spa-fade-active {
             opacity: 1;
-            transform: translateY(0);
+            transition: opacity 0.2s ease-in-out;
         }
     `;
     document.head.appendChild(style);
@@ -46,13 +47,13 @@
                 progressBar.style.opacity = '0';
                 setTimeout(() => {
                     progressBar.style.width = '0%';
-                }, 400);
-            }, 250);
+                }, 350);
+            }, 200);
         }
     }
 
     /**
-     * Cari kontainer konten utama pada halaman (elemen dengan class container atau main)
+     * Dapatkan kontainer utama halaman (#app-main)
      */
     function getMainContainer(doc = document) {
         return doc.querySelector('#app-main') ||
@@ -63,15 +64,15 @@
     }
 
     /**
-     * Perbarui status aktif pada navigasi navbar
+     * Perbarui status menu aktif pada navbar
      */
-    function updateActiveNav(targetPath) {
-        const currentPath = targetPath.split('?')[0].split('#')[0].split('/').pop() || 'index.php';
+    function updateActiveNav(targetUrl) {
+        const cleanPath = targetUrl.split('?')[0].split('#')[0].split('/').pop() || 'index.php';
         document.querySelectorAll('.navbar-nav .nav-link').forEach(link => {
             const href = link.getAttribute('href') || '';
             const linkPath = href.split('?')[0].split('#')[0].split('/').pop() || 'index.php';
             
-            if (currentPath === linkPath || (currentPath === '' && linkPath === 'index.php')) {
+            if (cleanPath === linkPath || (cleanPath === '' && linkPath === 'index.php')) {
                 link.classList.add('active');
                 link.setAttribute('aria-current', 'page');
             } else {
@@ -82,10 +83,10 @@
     }
 
     /**
-     * Jalankan kembali script inline yang ada pada halaman yang baru dimuat
+     * Eksekusi seluruh skrip spesifik halaman yang baru dimuat
      */
-    function executeScripts(container) {
-        // Bersihkan chart.js canvas bila ada instance aktif
+    function executePageScripts(doc) {
+        // 1. Bersihkan instance chart lama bila ada (mencegah error canvas is already in use)
         if (window.mySentimentChart && typeof window.mySentimentChart.destroy === 'function') {
             try {
                 window.mySentimentChart.destroy();
@@ -95,36 +96,72 @@
             }
         }
 
-        const scripts = container.querySelectorAll('script');
-        scripts.forEach(oldScript => {
-            const newScript = document.createElement('script');
-            // Salin atribut
-            Array.from(oldScript.attributes).forEach(attr => {
-                newScript.setAttribute(attr.name, attr.value);
-            });
-            // Salin inline script
-            newScript.textContent = oldScript.textContent;
-            
-            // Pasang ke DOM agar dieksekusi browser
-            document.body.appendChild(newScript);
-            // Bersihkan setelah eksekusi agar tidak menumpuk di body
-            newScript.remove();
+        // 2. Kumpulkan seluruh tag script dari dokumen yang baru di-fetch
+        // Periksa baik yang berada di dalam #app-main maupun di dalam body/head
+        const incomingScripts = Array.from(doc.querySelectorAll('script'));
+
+        incomingScripts.forEach(script => {
+            const src = script.getAttribute('src');
+
+            // Lewati library vendor umum yang sudah terpasang
+            if (src) {
+                if (src.includes('router.js') || 
+                    src.includes('bootstrap') || 
+                    src.includes('jquery')) {
+                    return;
+                }
+
+                // Jika ada library eksternal (seperti Chart.js) yang belum ada di dokumen saat ini, pasang
+                if (!document.querySelector(`script[src="${src}"]`)) {
+                    const extScript = document.createElement('script');
+                    Array.from(script.attributes).forEach(attr => extScript.setAttribute(attr.name, attr.value));
+                    document.head.appendChild(extScript);
+                }
+                return;
+            }
+
+            // Script Inline
+            const code = script.textContent.trim();
+            if (!code) return;
+
+            // Jangan jalankan kembali inisialisasi router di inline
+            if (code.includes('SPA Client-side Router') || code.includes('spa-progress-bar')) {
+                return;
+            }
+
+            // Eksekusi skrip inline dalam scope terisolasi (IIFE)
+            // Menggunakan DOM script injection agar terhubung penuh dengan window & document
+            try {
+                const s = document.createElement('script');
+                s.type = 'text/javascript';
+                s.className = 'spa-page-script';
+                // Bungkus dalam fungsi anonim agar const/let/function tidak bentrok saat navigasi bolak-balik
+                s.textContent = `(function() {\n${code}\n})();`;
+                
+                document.body.appendChild(s);
+                // Bersihkan elemen tag dari DOM setelah eksekusi berjalan
+                s.remove();
+            } catch (err) {
+                console.error('Error saat mengeksekusi skrip halaman SPA:', err);
+            }
         });
     }
 
     /**
-     * Muat dan ganti konten halaman via AJAX (SPA Navigation)
+     * Navigasi halaman SPA via AJAX/Fetch
      */
     async function navigateTo(url, push = true) {
         try {
-            setProgress(30);
+            setProgress(25);
 
-            const currentContainer = getMainContainer(document);
-            if (currentContainer) {
-                currentContainer.classList.add('spa-fade-enter');
+            const currentMain = getMainContainer(document);
+            if (currentMain) {
+                currentMain.classList.add('spa-fade-enter');
             }
 
-            setProgress(60);
+            setProgress(55);
+
+            // Fetch konten HTML halaman target
             const response = await fetch(url, {
                 headers: {
                     'X-Requested-With': 'SPA-Router'
@@ -132,7 +169,7 @@
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status} saat memuat ${url}`);
+                throw new Error(`Gagal memuat URL (${response.status}): ${url}`);
             }
 
             const html = await response.text();
@@ -141,66 +178,65 @@
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
 
-            // 1. Update Title
-            if (doc.title) {
-                document.title = doc.title;
-            }
-
-            // 2. Ganti konten utama
-            const newContainer = getMainContainer(doc);
-            if (newContainer && currentContainer) {
-                currentContainer.innerHTML = newContainer.innerHTML;
-                
-                // Salin atribut class jika berbeda
-                if (newContainer.className && currentContainer.className !== newContainer.className) {
-                    currentContainer.className = newContainer.className;
-                }
-
-                // Efek transisi halus
-                currentContainer.classList.remove('spa-fade-enter');
-                currentContainer.classList.add('spa-fade-active');
-                setTimeout(() => {
-                    currentContainer.classList.remove('spa-fade-active');
-                }, 300);
-
-                // 3. Jalankan script pada halaman baru
-                executeScripts(newContainer);
-            } else {
-                // Fallback jika struktur berbeda: reload halaman biasa
-                window.location.href = url;
-                return;
-            }
-
-            // 4. Update URL History
+            // 1. PENTING: Update URL di History SEBELUM skrip dijalankan!
+            // Agar window.location.href & window.location.search sinkron dengan query parameter baru (misal ?id=5)
             if (push) {
                 window.history.pushState({ spa: true, url: url }, '', url);
             }
 
-            // 5. Update status navbar aktif
+            // 2. Perbarui judul halaman (<title>)
+            if (doc.title) {
+                document.title = doc.title;
+            }
+
+            // 3. Ganti konten kontainer utama
+            const newMain = getMainContainer(doc);
+            if (newMain && currentMain) {
+                currentMain.innerHTML = newMain.innerHTML;
+
+                if (newMain.className && currentMain.className !== newMain.className) {
+                    currentMain.className = newMain.className;
+                }
+
+                currentMain.classList.remove('spa-fade-enter');
+                currentMain.classList.add('spa-fade-active');
+                setTimeout(() => {
+                    currentMain.classList.remove('spa-fade-active');
+                }, 200);
+            } else {
+                // Fallback jika struktur berbeda: lakukan navigasi normal
+                window.location.href = url;
+                return;
+            }
+
+            // 4. Perbarui status aktif navigasi navbar
             updateActiveNav(url);
 
-            // 6. Scroll ke atas
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            // 5. Scroll halaman ke atas
+            window.scrollTo({ top: 0, behavior: 'instant' });
+
+            // 6. Eksekusi seluruh skrip halaman yang baru
+            executePageScripts(doc);
 
             setProgress(100);
 
         } catch (err) {
-            console.error('SPA Router navigation failed, fallback to standard reload:', err);
+            console.error('SPA navigation failed, beralih ke reload browser standar:', err);
             setProgress(100);
             window.location.href = url;
         }
     }
 
     /**
-     * Cek apakah URL valid untuk ditangani oleh SPA Router
+     * Memeriksa apakah tautan memenuhi syarat untuk navigasi SPA
      */
     function isEligibleForSpa(link) {
         if (!link || !link.getAttribute) return false;
-        
+
         const href = link.getAttribute('href');
         if (!href) return false;
 
-        // Abaikan link khusus
+        // Abaikan link anchor, protokol khusus, download, atau target baru
         if (href.startsWith('#') || 
             href.startsWith('javascript:') || 
             href.startsWith('mailto:') || 
@@ -214,13 +250,13 @@
             return false;
         }
 
-        // Periksa origin (harus same-origin)
         try {
-            const url = new URL(href, window.location.href);
-            if (url.origin !== window.location.origin) return false;
-            
-            // Cek apakah menuju file aset fisik
-            if (/\.(css|js|png|jpg|jpeg|gif|svg|ico|pdf|csv|xlsx|zip)$/i.test(url.pathname)) {
+            const targetUrl = new URL(href, window.location.href);
+            // Harus satu domain (same-origin)
+            if (targetUrl.origin !== window.location.origin) return false;
+
+            // Abaikan file dokumen statis
+            if (/\.(css|js|png|jpg|jpeg|gif|svg|ico|pdf|csv|xlsx|zip)$/i.test(targetUrl.pathname)) {
                 return false;
             }
 
@@ -230,9 +266,7 @@
         }
     }
 
-    /**
-     * Tangkap semua event click pada tautan yang memenuhi syarat
-     */
+    // Tangkap klik pada seluruh link yang memenuhi syarat
     document.addEventListener('click', function (e) {
         const link = e.target.closest('a');
         if (!link) return;
@@ -244,20 +278,18 @@
         }
     });
 
-    /**
-     * Tangani tombol Back / Forward browser
-     */
+    // Tangani tombol browser Back & Forward
     window.addEventListener('popstate', function (e) {
         navigateTo(window.location.href, false);
     });
 
-    // Inisialisasi navbar aktif saat pertama kali dimuat
+    // Inisialisasi navbar aktif saat pertama kali dibuka
     document.addEventListener('DOMContentLoaded', function () {
         updateActiveNav(window.location.href);
     });
 
-    // Ekspos fungsi global untuk kemudahan akses dari script lain
+    // Ekspos fungsi navigasi global
     window.spaNavigate = navigateTo;
 
-    console.log('SentiGuard SPA Router active.');
+    console.log('SentiGuard MBG SPA Router initialized and ready.');
 })();
