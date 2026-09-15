@@ -13,6 +13,78 @@ $prediction = new Prediction($conn);
 $models = $mlModel->history(20);
 $predictions = $prediction->history(50);
 
+// Leksikon pendeteksi kata makian/hinaan cyberbullying sejati vs Negatif Biasa (Kritik Wajar)
+$cyberbullyingLexicon = [
+    "anjing", "anjir", "anjay", "anjrit", "asu", "babi", "bangsat", "bajingan",
+    "kampret", "tai", "taek", "kontol", "memek", "ngentot", "peler", "pantek", "puki",
+    "kntl", "mmk", "bgst", "anj", "asw",
+    "tolol", "goblok", "bego", "idiot", "bodoh", "dungu", "autis", "cacat", "bloon",
+    "pekok", "sinting", "gila", "sarap", "miring", "gembel", "udik", "kampungan",
+    "sampah", "najis", "busuk", "bangkai", "racun", "beracun", "mampus", "mati",
+    "laknat", "celaka", "dajjal", "iblis", "setan", "jahanam", "sialan", "biadab",
+    "haram", "maling", "rampok", "koruptor", "korupsi", "pencitraan", "ngapusi",
+    "monyet", "cebong", "bencong", "banci", "jelek bet", "muka lu", "babu"
+];
+
+function checkCyberbullyingText(string $text, array $lexicon): array {
+    $lower = strtolower($text);
+    $detected = [];
+    foreach ($lexicon as $term) {
+        if (preg_match('/\b' . preg_quote($term, '/') . '\b/i', $lower)) {
+            $detected[] = $term;
+        }
+    }
+    return $detected;
+}
+
+$predCbCount = 0;
+$predOrdNegCount = 0;
+$predPosCount = 0;
+$predNeuCount = 0;
+
+$processedPredictions = [];
+foreach ($predictions as $p) {
+    $pred = $p["prediction"] ?? "";
+    $detectedTerms = checkCyberbullyingText($p["comment"] ?? "", $cyberbullyingLexicon);
+
+    if ($pred === "Negatif" && !empty($detectedTerms)) {
+        $category = "Cyberbullying";
+        $badgeClass = "bg-danger";
+        $labelTitle = "🚨 Cyberbullying";
+        $labelDesc = "Makian: " . implode(", ", $detectedTerms);
+        $isCyberbullying = true;
+        $predCbCount++;
+    } elseif ($pred === "Negatif") {
+        $category = "Negatif Biasa";
+        $badgeClass = "bg-warning text-dark";
+        $labelTitle = "💬 Negatif Biasa";
+        $labelDesc = "Kritik / Keluhan Wajar (Non-CB)";
+        $isCyberbullying = false;
+        $predOrdNegCount++;
+    } elseif ($pred === "Positif") {
+        $category = "Positif";
+        $badgeClass = "bg-success";
+        $labelTitle = "🛡️ Positif";
+        $labelDesc = "Apresiasi / Non-CB";
+        $isCyberbullying = false;
+        $predPosCount++;
+    } else {
+        $category = "Netral";
+        $badgeClass = "bg-secondary";
+        $labelTitle = "ℹ️ Netral";
+        $labelDesc = "Informasi / Non-CB";
+        $isCyberbullying = false;
+        $predNeuCount++;
+    }
+
+    $p["detected_terms"] = $detectedTerms;
+    $p["category"] = $category;
+    $p["badge_class"] = $badgeClass;
+    $p["label_title"] = $labelTitle;
+    $p["label_desc"] = $labelDesc;
+    $p["is_cb"] = $isCyberbullying;
+    $processedPredictions[] = $p;
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -105,6 +177,47 @@ $predictions = $prediction->history(50);
       <?php if (empty($predictions)): ?>
         <p class="text-muted p-4 mb-0">Belum ada riwayat prediksi komentar. Coba uji komentar pada halaman <a href="predict.php" data-spa="true">Prediksi</a>.</p>
       <?php else: ?>
+
+      <!-- 4-Kategori Counter Ringkasan -->
+      <div class="row g-2 p-3 bg-light border-bottom m-0">
+        <div class="col-md-3">
+          <div class="p-2 border rounded bg-danger-subtle border-danger d-flex align-items-center justify-content-between">
+            <div>
+              <span class="badge bg-danger">🚨 CYBERBULLYING</span>
+              <div class="small text-muted">Makian / Hinaan</div>
+            </div>
+            <div class="fs-5 fw-bold text-danger"><?= $predCbCount ?></div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="p-2 border rounded bg-warning-subtle border-warning d-flex align-items-center justify-content-between">
+            <div>
+              <span class="badge bg-warning text-dark">💬 NEGATIF BIASA</span>
+              <div class="small text-muted">Kritik / Keluhan Wajar</div>
+            </div>
+            <div class="fs-5 fw-bold text-warning-emphasis"><?= $predOrdNegCount ?></div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="p-2 border rounded bg-success-subtle border-success d-flex align-items-center justify-content-between">
+            <div>
+              <span class="badge bg-success">🛡️ POSITIF</span>
+              <div class="small text-muted">Apresiasi / Non-CB</div>
+            </div>
+            <div class="fs-5 fw-bold text-success"><?= $predPosCount ?></div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="p-2 border rounded bg-white border d-flex align-items-center justify-content-between">
+            <div>
+              <span class="badge bg-secondary">ℹ️ NETRAL</span>
+              <div class="small text-muted">Informasi / Non-CB</div>
+            </div>
+            <div class="fs-5 fw-bold text-secondary"><?= $predNeuCount ?></div>
+          </div>
+        </div>
+      </div>
+
       <div class="table-responsive">
         <table class="table table-hover table-bordered table-sm mb-0 align-middle">
           <thead class="table-light">
@@ -117,19 +230,15 @@ $predictions = $prediction->history(50);
             </tr>
           </thead>
           <tbody>
-            <?php foreach ($predictions as $p): ?>
-            <?php
-              $pred = $p["prediction"] ?? "";
-              $isCb = ($pred === "Negatif");
-              $badgeClass = $isCb ? "bg-danger" : ($pred === "Positif" ? "bg-success" : "bg-secondary");
-              $statusTitle = $isCb ? "🚨 Cyberbullying" : ($pred === "Positif" ? "🛡️ Non-Cyberbullying" : "🛡️ Non-Cyberbullying");
-            ?>
+            <?php foreach ($processedPredictions as $p): ?>
             <tr>
               <td><?= htmlspecialchars($p["comment"]) ?></td>
               <td><code class="small"><?= htmlspecialchars($p["preprocessing"] ?? "-") ?></code></td>
               <td class="text-center">
-                <span class="badge <?= $badgeClass ?> fs-6"><?= htmlspecialchars($pred) ?></span><br>
-                <small class="fw-semibold <?= $isCb ? 'text-danger' : 'text-success' ?>"><?= $statusTitle ?></small>
+                <span class="badge <?= $p["badge_class"] ?> fs-6"><?= $p["label_title"] ?></span><br>
+                <small class="<?= $p["is_cb"] ? 'text-danger fw-bold' : ($p['category'] === 'Negatif Biasa' ? 'text-warning-emphasis fw-semibold' : 'text-muted') ?>">
+                  <?= htmlspecialchars($p["label_desc"]) ?>
+                </small>
               </td>
               <td class="text-center fw-bold">
                 <?= $p["probability"] !== null ? round($p["probability"] * 100, 2) . "%" : "-" ?>

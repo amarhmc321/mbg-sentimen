@@ -4,7 +4,8 @@ import joblib
 from services.trainer import (
     preprocess_text,
     clean_sentiment_label,
-    get_cyberbullying_category
+    get_cyberbullying_category,
+    detect_cyberbullying_terms
 )
 
 MODEL_DIR = os.path.join(
@@ -46,7 +47,6 @@ def predict_sentiment(text):
     model, vectorizer = _load()
 
     clean_text = preprocess_text(text)
-
     X = vectorizer.transform([clean_text])
 
     raw_prediction = model.predict(X)[0]
@@ -59,26 +59,55 @@ def predict_sentiment(text):
         for label, prob in zip(model.classes_, probabilities)
     }
 
-    cb_category = get_cyberbullying_category(prediction)
+    # Pembedaan tegas: Apakah Negatif ini Cyberbullying atau Negatif Biasa (Kritik Wajar)?
+    cb_terms = detect_cyberbullying_terms(text)
+    
+    # Jika teks memuat leksikon makian/hinaan/serangan verbal nyata:
+    # Teks dipastikan sebagai CYBERBULLYING (Sentimen Negatif Agresif)
+    if cb_terms:
+        prediction = "Negatif"
+        cb_category = {
+            "status": "Cyberbullying",
+            "sub_category": "Negatif (🚨 Cyberbullying)",
+            "is_cyberbullying": True,
+            "is_ordinary_negative": False,
+            "badge": "danger",
+            "icon": "bi-exclamation-octagon-fill",
+            "detected_terms": cb_terms,
+            "desc": f"Terdeteksi CYBERBULLYING: Memuat indikasi makian, cemoohan, atau ujaran kebencian ('{', '.join(cb_terms)}')."
+        }
+    else:
+        cb_category = get_cyberbullying_category(prediction, text)
 
-    # Penjelasan naratif yang sangat jelas untuk user dan penguji sidang
+    detected_terms = cb_category.get("detected_terms", [])
+    terms_str = f" ('{', '.join(detected_terms)}')" if detected_terms else ""
+
     if cb_category["is_cyberbullying"]:
+        status_title = "🚨 TERDETEKSI CYBERBULLYING"
         explanation = (
-            "🚨 PERINGATAN: Komentar ini teridentifikasi sebagai Sentimen NEGATIF dan dikategorikan "
-            "sebagai CYBERBULLYING. Teks memuat indikasi cemoohan, perundungan, ujaran kebencian, "
-            "atau serangan destruktif terhadap program MBG atau pihak terkait."
+            f"Komentar ini berstatus Sentimen NEGATIF dan teridentifikasi sebagai CYBERBULLYING{terms_str}. "
+            f"Teks memuat indikasi makian, cemoohan, pelecehan martabat, atau ujaran kebencian agresif terhadap pihak/program MBG."
+        )
+    elif cb_category["is_ordinary_negative"] or (prediction == "Negatif" and not cb_terms):
+        cb_category["is_ordinary_negative"] = True
+        cb_category["status"] = "Negatif Biasa"
+        status_title = "💬 KOMENTAR NEGATIF BIASA (BUKAN CYBERBULLYING)"
+        explanation = (
+            "Komentar ini berstatus Sentimen NEGATIF namun HANYA berupa kritik konstruktif atau keluhan wajar "
+            "(seperti ketidakpuasan porsi, rasa hambar/dingin, variasi menu, atau saran perbaikan). "
+            "Teks TIDAK memuat kata makian kasar, hinaan personal, atau unsur perundungan siber (Aman)."
         )
     elif prediction == "Positif":
+        status_title = "🛡️ NON-CYBERBULLYING (Sentimen Positif)"
         explanation = (
-            "🛡️ AMAN: Komentar ini teridentifikasi sebagai Sentimen POSITIF dan dikategorikan "
-            "sebagai NON-CYBERBULLYING. Teks memuat opini apresiasi, kepuasan, dukungan, "
-            "atau antusiasme baik terhadap program MBG."
+            "Komentar ini teridentifikasi sebagai Sentimen POSITIF dan tergolong NON-CYBERBULLYING. "
+            "Teks memuat opini apresiasi, kepuasan, rasa syukur, atau dukungan positif terhadap program MBG."
         )
     else:
+        status_title = "ℹ️ NON-CYBERBULLYING (Sentimen Netral)"
         explanation = (
-            "🛡️ AMAN: Komentar ini teridentifikasi sebagai Sentimen NETRAL dan dikategorikan "
-            "sebagai NON-CYBERBULLYING. Teks memuat pertanyaan, diskusi wajar, fakta objektif, "
-            "atau pernyataan netral tanpa unsur perundungan."
+            "Komentar ini teridentifikasi sebagai Sentimen NETRAL dan tergolong NON-CYBERBULLYING. "
+            "Teks memuat pertanyaan informasi, diskusi umum, atau pernyataan faktual objektif tanpa muatan perundungan."
         )
 
     confidence = round(float(max(probabilities)), 5)
@@ -88,8 +117,12 @@ def predict_sentiment(text):
         "preprocessing": clean_text,
         "prediction": prediction,
         "sentiment": prediction,
-        "cyberbullying_status": cb_category["status"],
-        "is_cyberbullying": cb_category["is_cyberbullying"],
+        "cyberbullying_status": cb_category["status"],       # "Cyberbullying", "Negatif Biasa", "Positif", "Netral"
+        "sub_category": cb_category["sub_category"],         # Label lengkap
+        "is_cyberbullying": cb_category["is_cyberbullying"], # True HANYA jika benar-benar cyberbullying
+        "is_ordinary_negative": cb_category["is_ordinary_negative"], # True jika negatif biasa / kritik
+        "detected_terms": detected_terms,
+        "status_title": status_title,
         "badge_color": cb_category["badge"],
         "icon": cb_category["icon"],
         "explanation": explanation,

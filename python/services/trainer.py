@@ -28,11 +28,34 @@ MODEL_DIR = os.path.join(
     "models"
 )
 
+# =========================================================================
+# LEKSIKON KATA KASAR, UMPATAN, HINAAN, & SERANGAN VERBAL (CYBERBULLYING)
+# Digunakan untuk memisahkan antara komentar yang BENAR-BENAR CYBERBULLYING
+# dengan KOMENTAR NEGATIF BIASA (kritik porsi/rasa/keluhan wajar tanpa perundungan).
+# =========================================================================
+CYBERBULLYING_LEXICON = {
+    # Kata kasar / umpatan binatang & kotoran
+    "anjing", "anjir", "anjay", "anjrit", "asu", "babi", "bangsat", "bajingan",
+    "kampret", "tai", "taek", "kontol", "memek", "ngentot", "peler", "pantek", "puki",
+    "kntl", "mmk", "bgst", "anj", "asw",
+    
+    # Hinaan kapabilitas / intelektual / penghinaan personal
+    "tolol", "goblok", "bego", "idiot", "bodoh", "dungu", "autis", "cacat", "bloon",
+    "pekok", "sinting", "gila", "sarap", "miring", "gembel", "udik", "kampungan",
+    
+    # Kata cemoohan agresif, menjijikkan & sumpah serapah
+    "sampah", "najis", "busuk", "bangkai", "racun", "beracun", "mampus", "mati",
+    "laknat", "celaka", "dajjal", "iblis", "setan", "jahanam", "sialan", "biadab",
+    "haram", "maling", "rampok", "koruptor", "korupsi", "pencitraan", "ngapusi",
+    
+    # Hinaan fisik / rasisme / ejekan merendahkan
+    "monyet", "cebong", "bencong", "banci", "jelek bet", "muka lu", "babu"
+}
+
 
 def clean_sentiment_label(raw_label):
     """
-    Normalisasi label sentimen dari berbagai format (misal ada emoji '😡 Negatif', '😊 Positif', '😐 Netral', dll.)
-    menjadi label standar: 'Negatif', 'Positif', 'Netral'.
+    Normalisasi label sentimen: 'Negatif', 'Positif', 'Netral'.
     """
     if pd.isna(raw_label):
         return "Netral"
@@ -49,33 +72,90 @@ def clean_sentiment_label(raw_label):
     elif "non" in lower:
         return "Positif"
     
-    # Bersihkan karakter non-alfanumerik jika masih ada format lain
     cleaned = re.sub(r"[^\w\s]", "", text).strip()
     return cleaned if cleaned else text
 
 
-def get_cyberbullying_category(sentiment_label):
+def detect_cyberbullying_terms(text):
     """
-    Pemetaan tegas Kategori Cyberbullying:
-    - Negatif           -> Cyberbullying (Ujaran kebencian, makian, cemoohan, perundungan terhadap MBG)
-    - Positif / Netral  -> Non-Cyberbullying (Apresiasi, dukungan, informasi objektif, pertanyaan)
+    Mendeteksi apakah sebuah teks memuat kata kunci leksikon cyberbullying (makian/hinaan).
+    Mengembalikan daftar kata yang terdeteksi.
+    """
+    if not text:
+        return []
+    
+    clean = re.sub(r"[^\w\s]", " ", str(text).lower())
+    words = clean.split()
+    
+    found = []
+    for w in words:
+        if w in CYBERBULLYING_LEXICON and w not in found:
+            found.append(w)
+            
+    return found
+
+
+def get_cyberbullying_category(sentiment_label, text=None):
+    """
+    Pemetaan Kategori Cyberbullying yang Tepat Sesuai Permintaan Pengguna:
+    - Tidak semua komentar negatif berunsur cyberbullying.
+    - 🚨 CYBERBULLYING: Sentimen Negatif yang memuat makian, cemoohan, hinaan, atau ujaran kebencian.
+    - 💬 NEGATIF BIASA: Sentimen Negatif berupa keluhan wajar, kritik porsi/rasa/antrean tanpa kata kasar/hinaan.
+    - 🛡️ POSITIF: Apresiasi, dukungan, kepuasan (Non-Cyberbullying).
+    - ℹ️ NETRAL: Informasi objektif, pertanyaan, atau netral (Non-Cyberbullying).
     """
     norm = clean_sentiment_label(sentiment_label)
+    
     if norm == "Negatif":
+        terms = detect_cyberbullying_terms(text)
+        
+        # Jika teks memiliki kata umpatan/makian atau label eksplisit cyberbullying
+        is_cb = bool(terms) or (text and "cyberbullying" in str(text).lower() and "non" not in str(text).lower())
+        
+        if is_cb:
+            terms_display = ", ".join(terms) if terms else "kata kasar/hinaan"
+            return {
+                "status": "Cyberbullying",
+                "sub_category": "Negatif (🚨 Cyberbullying)",
+                "is_cyberbullying": True,
+                "is_ordinary_negative": False,
+                "badge": "danger",
+                "icon": "bi-exclamation-octagon-fill",
+                "detected_terms": terms,
+                "desc": f"Terdeteksi CYBERBULLYING: Memuat makian, cemoohan, atau ujaran kebencian ({terms_display})."
+            }
+        else:
+            return {
+                "status": "Negatif Biasa",
+                "sub_category": "Negatif (💬 Kritik/Keluhan Wajar)",
+                "is_cyberbullying": False,
+                "is_ordinary_negative": True,
+                "badge": "warning",
+                "icon": "bi-chat-square-text-fill",
+                "detected_terms": [],
+                "desc": "KOMENTAR NEGATIF BIASA (BUKAN CYBERBULLYING): Hanyalah keluhan rasa/porsi atau kritik wajar terhadap program MBG, tanpa unsur makian atau perundungan."
+            }
+    elif norm == "Positif":
         return {
-            "status": "Cyberbullying",
-            "is_cyberbullying": True,
-            "badge": "danger",
-            "icon": "bi-exclamation-triangle-fill",
-            "desc": "Terindikasi ujaran perundungan/cemoohan negatif (Cyberbullying)."
+            "status": "Positif",
+            "sub_category": "Positif (🛡️ Non-Cyberbullying)",
+            "is_cyberbullying": False,
+            "is_ordinary_negative": False,
+            "badge": "success",
+            "icon": "bi-shield-check",
+            "detected_terms": [],
+            "desc": "NON-CYBERBULLYING: Komentar memuat opini positif, apresiasi, atau dukungan terhadap program MBG."
         }
     else:
         return {
-            "status": "Non-Cyberbullying",
+            "status": "Netral",
+            "sub_category": "Netral (ℹ️ Non-Cyberbullying)",
             "is_cyberbullying": False,
-            "badge": "success" if norm == "Positif" else "secondary",
-            "icon": "bi-shield-check",
-            "desc": "Bukan cyberbullying (komentar positif/netral aman)."
+            "is_ordinary_negative": False,
+            "badge": "secondary",
+            "icon": "bi-info-circle-fill",
+            "detected_terms": [],
+            "desc": "NON-CYBERBULLYING: Komentar bersifat netral, faktual, pertanyaan wajar, atau pernyataan umum tanpa unsur perundungan."
         }
 
 
@@ -99,31 +179,31 @@ def diagnose_misclassification(actual, pred, raw_text, clean_text, vocab, probab
     """
     tokens = clean_text.split() if clean_text else []
     oov_tokens = [t for t in tokens if t not in vocab]
+    cb_terms = detect_cyberbullying_terms(raw_text)
     
     reasons = []
     
-    # 1. Teks sangat pendek
+    # 1. Pembedaan Cyberbullying vs Negatif Biasa
+    if actual == "Negatif":
+        if cb_terms:
+            reasons.append(f"Komentar ini merupakan CYBERBULLYING sejati (mengandung kata '{', '.join(cb_terms)}'), namun model mengklasifikasikannya ke kelas '{pred}'.")
+        else:
+            reasons.append("Komentar ini adalah NEGATIF BIASA (keluhan/kritik wajar tanpa unsur perundungan/makian).")
+            
+    # 2. Teks sangat pendek
     if len(tokens) <= 2:
         reasons.append("Teks sangat singkat (kurang dari 3 kata bersih), informasi fitur TF-IDF minim.")
         
-    # 2. Out-of-vocabulary (banyak kata tidak ada di data latih)
+    # 3. Out-of-vocabulary
     if oov_tokens:
         reasons.append(f"Terdapat kata yang tidak ada dalam vocabulary data latih: '{', '.join(oov_tokens[:4])}'.")
         
-    # 3. Analisis False Negative Cyberbullying (Aktual Negatif/Cyberbullying diprediksi Netral/Positif)
-    if actual == "Negatif" and pred in ["Netral", "Positif"]:
-        reasons.append("Pola sarkasme/sindiran halus atau penggunaan kata umum tanpa kata makian eksplisit, sehingga model Naive Bayes condong ke kelas non-cyberbullying.")
-        
-    # 4. Analisis False Positive Cyberbullying (Aktual Positif/Netral diprediksi Negatif/Cyberbullying)
-    elif actual in ["Positif", "Netral"] and pred == "Negatif":
-        reasons.append("Komentar mengandung kata bernada evaluatif atau kata yang sering diasosiasikan dengan keluhan pada data latih, padahal konteksnya adalah masukan wajar/netral.")
-        
-    # 5. Margin probabilitas tipis
+    # 4. Ambiguitas probabilitas
     probs = list(probabilities.values())
     if len(probs) >= 2:
         sorted_probs = sorted(probs, reverse=True)
         if (sorted_probs[0] - sorted_probs[1]) < 0.15:
-            reasons.append(f"Selisih probabilitas antar-kelas sangat tipis ({round((sorted_probs[0] - sorted_probs[1])*100, 1)}%), menunjukkan tingkat ambiguitas fitur yang tinggi.")
+            reasons.append(f"Selisih probabilitas antar-kelas sangat tipis ({round((sorted_probs[0] - sorted_probs[1])*100, 1)}%), menunjukkan tingkat ambiguitas fitur.")
 
     if not reasons:
         reasons.append("Distribusi bobot kata pada teks lebih dominan mengarah ke pola kata kelas prediksi pada data latih.")
@@ -145,17 +225,13 @@ def train_model(csv_path):
     df = df.dropna(subset=["Komentar", "Sentimen"]).reset_index(drop=True)
 
     if len(df) < 4:
-        raise Exception(
-            "Dataset terlalu sedikit untuk dilatih (minimal 4 baris dengan label)."
-        )
+        raise Exception("Dataset terlalu sedikit untuk dilatih (minimal 4 baris dengan label).")
 
     # Normalisasi kolom label sentimen
     df["Sentimen"] = df["Sentimen"].apply(clean_sentiment_label)
 
     # 2. Preprocessing teks
     df["komentar_bersih"] = df["Komentar"].apply(preprocess_text)
-
-    # Buang baris yang jadi kosong setelah preprocessing
     df = df[df["komentar_bersih"].str.strip() != ""].reset_index(drop=True)
 
     if len(df) < 4:
@@ -168,7 +244,6 @@ def train_model(csv_path):
 
     stratify = y if min_class_count >= 2 else None
     
-    # Split index untuk mempertahankan referensi baris utuh (untuk error analysis)
     train_indices, test_indices = train_test_split(
         df.index,
         test_size=0.2,
@@ -212,11 +287,30 @@ def train_model(csv_path):
     total_incorrect = total_test - total_correct
 
     # =========================================================================
-    # PERHITUNGAN DETAIL PER KELAS & URAIAN MATEMATIS (STEP-BY-STEP EVALUATION)
+    # HITUNG SEBARAN CYBERBULLYING VS NEGATIF BIASA PADA DATASET
+    # =========================================================================
+    cyberbullying_total = 0
+    ordinary_negative_total = 0
+    positive_total = 0
+    neutral_total = 0
+
+    for idx_row in range(len(df)):
+        s_lbl = df["Sentimen"].iloc[idx_row]
+        c_txt = str(df["Komentar"].iloc[idx_row])
+        cat = get_cyberbullying_category(s_lbl, c_txt)
+        if cat["is_cyberbullying"]:
+            cyberbullying_total += 1
+        elif cat["is_ordinary_negative"]:
+            ordinary_negative_total += 1
+        elif s_lbl == "Positif":
+            positive_total += 1
+        else:
+            neutral_total += 1
+
+    # =========================================================================
+    # PERHITUNGAN DETAIL PER KELAS & URAIAN MATEMATIS
     # =========================================================================
     class_evaluations = []
-    class_breakdown_formulas = []
-    
     support_total = 0
     
     for i, label in enumerate(labels):
@@ -294,7 +388,6 @@ def train_model(csv_path):
     # =========================================================================
     misclassified_items = []
     error_type_counts = {}
-
     training_vocab = vectorizer.vocabulary_
 
     for i in range(total_test):
@@ -319,8 +412,9 @@ def train_model(csv_path):
                 act, prd, raw_comment, clean_cmt, training_vocab, prob_map
             )
 
-            act_cb = get_cyberbullying_category(act)
-            prd_cb = get_cyberbullying_category(prd)
+            # Evaluasi apakah komentar aktual / prediksi adalah Cyberbullying Sejati atau Negatif Biasa
+            act_cb = get_cyberbullying_category(act, raw_comment)
+            prd_cb = get_cyberbullying_category(prd, raw_comment)
 
             misclassified_items.append({
                 "index": int(i + 1),
@@ -328,19 +422,21 @@ def train_model(csv_path):
                 "raw_comment": raw_comment,
                 "clean_comment": clean_cmt,
                 "actual_sentiment": act,
-                "actual_cyberbullying": act_cb["status"],
+                "actual_category": act_cb["sub_category"],
                 "actual_badge": act_cb["badge"],
+                "actual_is_cyberbullying": act_cb["is_cyberbullying"],
                 "predicted_sentiment": prd,
-                "predicted_cyberbullying": prd_cb["status"],
+                "predicted_category": prd_cb["sub_category"],
                 "predicted_badge": prd_cb["badge"],
+                "predicted_is_cyberbullying": prd_cb["is_cyberbullying"],
                 "confidence": round(conf * 100, 2),
                 "probabilities": prob_map,
+                "detected_terms": act_cb.get("detected_terms", []),
                 "reason_analysis": reason,
                 "is_false_cyberbullying": (not act_cb["is_cyberbullying"] and prd_cb["is_cyberbullying"]),
                 "is_missed_cyberbullying": (act_cb["is_cyberbullying"] and not prd_cb["is_cyberbullying"])
             })
 
-    # Rekap Error Cyberbullying
     false_pos_cb = sum(1 for item in misclassified_items if item["is_false_cyberbullying"])
     missed_cb = sum(1 for item in misclassified_items if item["is_missed_cyberbullying"])
     error_rate = (total_incorrect / total_test) * 100 if total_test > 0 else 0
@@ -360,8 +456,12 @@ def train_model(csv_path):
         "train_rows": len(df_train),
         "test_rows": len(df_test),
         "classes": labels,
-        "classes_cyberbullying_mapping": {
-            lbl: get_cyberbullying_category(lbl) for lbl in labels
+        "sentiment_distribution": {
+            "cyberbullying_count": cyberbullying_total,
+            "ordinary_negative_count": ordinary_negative_total,
+            "positive_count": positive_total,
+            "neutral_count": neutral_total,
+            "total_negative": cyberbullying_total + ordinary_negative_total
         },
         "evaluation": {
             "accuracy": round(accuracy, 4),
@@ -408,9 +508,9 @@ def train_model(csv_path):
             "error_type_counts": error_type_counts,
             "cyberbullying_impact": {
                 "false_cyberbullying_count": false_pos_cb,
-                "false_cyberbullying_desc": f"{false_pos_cb} komentar non-cyberbullying keliru terdeteksi sebagai cyberbullying (False Positive).",
+                "false_cyberbullying_desc": f"{false_pos_cb} komentar negatif biasa/non-cyberbullying keliru terdeteksi sebagai cyberbullying (False Positive).",
                 "missed_cyberbullying_count": missed_cb,
-                "missed_cyberbullying_desc": f"{missed_cb} komentar cyberbullying lolos dari deteksi (False Negative)."
+                "missed_cyberbullying_desc": f"{missed_cb} komentar cyberbullying sejati lolos dari deteksi (False Negative)."
             },
             "misclassified_samples": misclassified_items
         },

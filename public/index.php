@@ -19,27 +19,54 @@ $latestModel = $mlModel->latest();
 $distribution = $commentModel->sentimentDistribution();
 $datasets = $datasetModel->getAllWithStats();
 
-$chartLabels = [];
-$chartValues = [];
-$chartColors = ["Positif" => "#198754", "Negatif" => "#dc3545", "Netral" => "#ffc107"];
-$chartColorList = [];
-
-$cyberbullyingCount = 0;
-$nonCyberbullyingCount = 0;
+$positiveCount = 0;
+$neutralCount = 0;
 
 foreach ($distribution as $row) {
-    $sent = $row["sentiment"];
-    $tot = (int) $row["total"];
-    $chartLabels[] = $sent . ($sent === "Negatif" ? " (Cyberbullying)" : " (Non-CB)");
-    $chartValues[] = $tot;
-    $chartColorList[] = $chartColors[$sent] ?? "#6c757d";
-
-    if ($sent === "Negatif") {
-        $cyberbullyingCount += $tot;
-    } elseif ($sent === "Positif" || $sent === "Netral") {
-        $nonCyberbullyingCount += $tot;
+    if ($row["sentiment"] === "Positif") {
+        $positiveCount = (int) $row["total"];
+    } elseif ($row["sentiment"] === "Netral") {
+        $neutralCount = (int) $row["total"];
     }
 }
+
+// Leksikon pendeteksi Cyberbullying sejati vs Negatif Biasa
+$cyberbullyingLexicon = [
+    "anjing", "anjir", "anjay", "anjrit", "asu", "babi", "bangsat", "bajingan",
+    "kampret", "tai", "taek", "kontol", "memek", "ngentot", "peler", "pantek", "puki",
+    "kntl", "mmk", "tolol", "goblok", "bego", "idiot", "bodoh", "dungu", "autis",
+    "cacat", "bloon", "pekok", "sinting", "gila", "sarap", "miring", "gembel",
+    "sampah", "najis", "busuk", "bangkai", "racun", "beracun", "mampus", "mati",
+    "laknat", "celaka", "dajjal", "iblis", "setan", "jahanam", "sialan", "biadab",
+    "haram", "maling", "rampok", "koruptor", "korupsi", "pencitraan", "monyet",
+    "cebong", "bencong", "banci", "jelek bet"
+];
+
+$cyberbullyingCount = 0;
+$ordinaryNegativeCount = 0;
+
+$negResult = $conn->query("SELECT comment FROM comments WHERE sentiment = 'Negatif'");
+if ($negResult) {
+    while ($row = $negResult->fetch_assoc()) {
+        $textLower = strtolower($row["comment"] ?? "");
+        $isCb = false;
+        foreach ($cyberbullyingLexicon as $term) {
+            if (preg_match('/\b' . preg_quote($term, '/') . '\b/i', $textLower)) {
+                $isCb = true;
+                break;
+            }
+        }
+        if ($isCb) {
+            $cyberbullyingCount++;
+        } else {
+            $ordinaryNegativeCount++;
+        }
+    }
+}
+
+$chartLabels = ["Cyberbullying (Makian)", "Negatif Biasa (Kritik)", "Positif", "Netral"];
+$chartValues = [$cyberbullyingCount, $ordinaryNegativeCount, $positiveCount, $neutralCount];
+$chartColorList = ["#dc3545", "#fd7e14", "#198754", "#6c757d"];
 
 ?>
 <!DOCTYPE html>
@@ -69,7 +96,7 @@ foreach ($distribution as $row) {
   <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
       <h3 class="fw-bold mb-1">Dashboard Analisis Sentimen &amp; Deteksi Cyberbullying MBG</h3>
-      <p class="text-muted mb-0">Klasifikasi komentar TikTok program Makan Bergizi Gratis menggunakan TF-IDF &amp; Naive Bayes</p>
+      <p class="text-muted mb-0">Klasifikasi komentar TikTok program Makan Bergizi Gratis: Membedakan Cyberbullying vs Komentar Negatif Biasa</p>
     </div>
     <div>
       <a href="predict.php" data-spa="true" class="btn btn-primary me-2"><i class="bi bi-search me-1"></i> Prediksi Komentar</a>
@@ -77,25 +104,25 @@ foreach ($distribution as $row) {
     </div>
   </div>
 
-  <!-- Indikator Definisi Cyberbullying -->
+  <!-- Indikator Definisi: Cyberbullying vs Negatif Biasa -->
   <div class="alert alert-light border shadow-sm mb-4">
     <div class="row align-items-center g-3">
       <div class="col-md-6">
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-danger fs-6 px-3 py-2">🚨 CYBERBULLYING</span>
-          <span class="small text-muted">= Komentar bersentimen <b>Negatif</b> (berisi makian, cemoohan, pelecehan, atau tuduhan negatif terhadap program MBG).</span>
+        <div class="d-flex align-items-start gap-2 p-2 border rounded bg-danger-subtle">
+          <span class="badge bg-danger fs-6 mt-1">🚨 CYBERBULLYING</span>
+          <span class="small text-dark">Komentar negatif yang memuat <b>makian kasar, cemoohan, penghinaan martabat, atau ujaran kebencian</b> terhadap pihak/program MBG.</span>
         </div>
       </div>
       <div class="col-md-6">
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-success fs-6 px-3 py-2">🛡️ NON-CYBERBULLYING</span>
-          <span class="small text-muted">= Komentar bersentimen <b>Positif</b> (apresiasi/dukungan) &amp; <b>Netral</b> (informasi objektif/pertanyaan).</span>
+        <div class="d-flex align-items-start gap-2 p-2 border rounded bg-warning-subtle">
+          <span class="badge bg-warning text-dark fs-6 mt-1">💬 NEGATIF BIASA</span>
+          <span class="small text-dark">Komentar negatif berupa <b>kritik konstruktif, keluhan porsi/rasa, atau komplain wajar</b> TANPA unsur makian/hinaan (Bukan Cyberbullying).</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Statistik Ringkasan -->
+  <!-- Statistik Ringkasan 4 Kategori -->
   <div class="row g-3 mb-4">
 
     <div class="col-md-3">
@@ -111,9 +138,19 @@ foreach ($distribution as $row) {
     <div class="col-md-3">
       <div class="card shadow-sm border-0 text-center p-2 border-start border-danger border-4">
         <div class="card-body">
-          <div class="text-muted small fw-semibold">CYBERBULLYING (Negatif)</div>
+          <div class="text-muted small fw-semibold">🚨 CYBERBULLYING</div>
           <div class="fs-2 fw-bold text-danger"><?= $cyberbullyingCount ?></div>
-          <small class="text-muted">Komentar perlu dimoderasi</small>
+          <small class="text-muted">Makian / Hinaan Kasar</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 text-center p-2 border-start border-warning border-4">
+        <div class="card-body">
+          <div class="text-muted small fw-semibold">💬 NEGATIF BIASA</div>
+          <div class="fs-2 fw-bold text-warning-emphasis"><?= $ordinaryNegativeCount ?></div>
+          <small class="text-muted">Kritik / Keluhan Wajar (Aman)</small>
         </div>
       </div>
     </div>
@@ -121,21 +158,9 @@ foreach ($distribution as $row) {
     <div class="col-md-3">
       <div class="card shadow-sm border-0 text-center p-2 border-start border-success border-4">
         <div class="card-body">
-          <div class="text-muted small fw-semibold">NON-CYBERBULLYING</div>
-          <div class="fs-2 fw-bold text-success"><?= $nonCyberbullyingCount ?></div>
-          <small class="text-muted">Positif &amp; Netral (Aman)</small>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-3">
-      <div class="card shadow-sm border-0 text-center p-2 border-start border-primary border-4">
-        <div class="card-body">
-          <div class="text-muted small fw-semibold">AKURASI MODEL TERAKHIR</div>
-          <div class="fs-2 fw-bold text-primary">
-            <?= $latestModel && $latestModel["accuracy"] !== null ? round($latestModel["accuracy"] * 100, 2) . "%" : "-" ?>
-          </div>
-          <small class="text-muted"><?= $totalModels ?> model pernah dilatih</small>
+          <div class="text-muted small fw-semibold">🛡️ POSITIF &amp; NETRAL</div>
+          <div class="fs-2 fw-bold text-success"><?= $positiveCount + $neutralCount ?></div>
+          <small class="text-muted">Apresiasi &amp; Informasi (Aman)</small>
         </div>
       </div>
     </div>
@@ -147,10 +172,10 @@ foreach ($distribution as $row) {
     <div class="col-md-5">
       <div class="card shadow-sm border-0 h-100">
         <div class="card-header bg-white py-3 border-bottom">
-          <h6 class="mb-0 fw-bold"><i class="bi bi-pie-chart-fill me-2 text-primary"></i>Distribusi Sentimen &amp; Cyberbullying</h6>
+          <h6 class="mb-0 fw-bold"><i class="bi bi-pie-chart-fill me-2 text-primary"></i>Distribusi Cyberbullying &amp; Sentimen</h6>
         </div>
         <div class="card-body d-flex flex-column justify-content-center">
-          <?php if (empty($chartLabels)): ?>
+          <?php if (empty($chartValues) || array_sum($chartValues) === 0): ?>
             <p class="text-muted text-center my-4">Belum ada komentar berlabel. Upload dataset atau jalankan scraping terlebih dahulu.</p>
           <?php else: ?>
             <div style="position: relative; height: 240px;">
@@ -232,7 +257,7 @@ foreach ($distribution as $row) {
         <div class="card shadow-sm border-0 h-100 p-2">
           <div class="card-body">
             <h5 class="fw-bold text-dark"><i class="bi bi-shield-check text-primary me-2"></i>Prediksi Komentar</h5>
-            <p class="text-muted small mb-0">Uji komentar baru dan lihat status Cyberbullying vs Non-Cyberbullying secara instan.</p>
+            <p class="text-muted small mb-0">Uji komentar baru: Membedakan Cyberbullying vs Komentar Negatif Biasa.</p>
           </div>
         </div>
       </a>
@@ -241,7 +266,7 @@ foreach ($distribution as $row) {
 
 </div>
 
-<?php if (!empty($chartLabels)): ?>
+<?php if (!empty($chartValues) && array_sum($chartValues) > 0): ?>
 <script>
 (function() {
     let canvas = document.getElementById("sentimentChart");

@@ -195,9 +195,12 @@ $("#btnTrain").click(function () {
             html += "<div class='col-md-3'>Data Latih (80%): <b>" + res.train_rows + " data</b></div>";
             html += "<div class='col-md-3'>Data Uji (20%): <b>" + res.test_rows + " data</b></div>";
             html += "<div class='col-md-3'>Jumlah Kelas: <b>" + res.classes.length + " (" + res.classes.join(", ") + ")</b></div>";
-            html += "</div>";
+            let dist = res.sentiment_distribution || {};
             html += "<div class='mt-2 pt-2 border-top small text-muted'>";
-            html += "<b>Kategori Deteksi:</b> Sentimen <span class='badge bg-danger'>Negatif</span> = <b>Cyberbullying</b> | Sentimen <span class='badge bg-success'>Positif</span> &amp; <span class='badge bg-secondary'>Netral</span> = <b>Non-Cyberbullying</b>.";
+            html += "<b>Rincian Kategori Data:</b> <span class='badge bg-danger'>🚨 Cyberbullying</span>: <b>" + (dist.cyberbullying_count || 0) + "</b> data (makian/hinaan) | ";
+            html += "<span class='badge bg-warning text-dark'>💬 Negatif Biasa</span>: <b>" + (dist.ordinary_negative_count || 0) + "</b> data (kritik/keluhan wajar) | ";
+            html += "<span class='badge bg-success'>🛡️ Positif</span>: <b>" + (dist.positive_count || 0) + "</b> data | ";
+            html += "<span class='badge bg-secondary'>ℹ️ Netral</span>: <b>" + (dist.neutral_count || 0) + "</b> data";
             html += "</div>";
             html += "</div>";
 
@@ -456,8 +459,8 @@ $("#btnTrain").click(function () {
                 html += "        <tbody>";
 
                 samples.forEach(function (s) {
-                    let actBadge = (s.actual_sentiment === "Negatif") ? "bg-danger" : (s.actual_sentiment === "Positif" ? "bg-success" : "bg-secondary");
-                    let prdBadge = (s.predicted_sentiment === "Negatif") ? "bg-danger" : (s.predicted_sentiment === "Positif" ? "bg-success" : "bg-secondary");
+                    let actBadge = (s.actual_sentiment === "Negatif") ? (s.actual_is_cyberbullying ? "bg-danger" : "bg-warning text-dark") : (s.actual_sentiment === "Positif" ? "bg-success" : "bg-secondary");
+                    let prdBadge = (s.predicted_sentiment === "Negatif") ? (s.predicted_is_cyberbullying ? "bg-danger" : "bg-warning text-dark") : (s.predicted_sentiment === "Positif" ? "bg-success" : "bg-secondary");
 
                     html += "<tr>";
                     html += "  <td class='text-center fw-bold'>" + s.index + "</td>";
@@ -467,12 +470,10 @@ $("#btnTrain").click(function () {
                     html += "    <small class='text-muted'>User: @" + s.username + "</small>";
                     html += "  </td>";
                     html += "  <td>";
-                    html += "    <span class='badge " + actBadge + " fs-6'>" + s.actual_sentiment + "</span><br>";
-                    html += "    <small class='fw-semibold text-muted'>" + s.actual_cyberbullying + "</small>";
+                    html += "    <span class='badge " + actBadge + " fs-6'>" + (s.actual_category || s.actual_sentiment) + "</span>";
                     html += "  </td>";
                     html += "  <td>";
-                    html += "    <span class='badge " + prdBadge + " fs-6'>" + s.predicted_sentiment + "</span><br>";
-                    html += "    <small class='fw-semibold text-danger'>" + s.predicted_cyberbullying + "</small>";
+                    html += "    <span class='badge " + prdBadge + " fs-6'>" + (s.predicted_category || s.predicted_sentiment) + "</span>";
                     html += "  </td>";
                     html += "  <td>";
                     html += "    <span class='fw-bold text-dark'>" + s.confidence + "%</span>";

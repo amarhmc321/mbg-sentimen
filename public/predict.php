@@ -21,23 +21,35 @@
 
 <div class="container mb-5">
 
-  <!-- Penjelasan Konsep Klasifikasi -->
+  <!-- Penjelasan Konsep Klasifikasi: Cyberbullying vs Negatif Biasa -->
   <div class="alert alert-light border shadow-sm mb-4">
     <div class="d-flex align-items-center gap-2 mb-2">
       <i class="bi bi-info-circle-fill text-primary fs-5"></i>
-      <h6 class="mb-0 fw-bold">Pedoman Klasifikasi Cyberbullying vs Non-Cyberbullying</h6>
+      <h6 class="mb-0 fw-bold">Pedoman Klasifikasi: Membedakan Cyberbullying vs Komentar Negatif Biasa</h6>
     </div>
     <div class="row g-2 small text-muted">
       <div class="col-md-6">
-        <div class="p-2 border rounded bg-white">
-          <span class="badge bg-danger me-1">🚨 CYBERBULLYING</span> = Sentimen <b>Negatif</b>
-          <p class="mb-0 mt-1">Komentar berupa makian, cemoohan, pelecehan verbal, tuduhan tak berdasar, atau ujaran kebencian terhadap program MBG.</p>
+        <div class="p-2 border rounded bg-danger-subtle border-danger h-100">
+          <span class="badge bg-danger me-1">🚨 CYBERBULLYING</span> (Sentimen Negatif Agresif)
+          <p class="mb-0 mt-1 text-dark">Komentar negatif yang memuat <b>makian kasar, cemoohan, pelecehan personal/kelompok, penghinaan martabat, atau ujaran kebencian</b> terhadap pihak/program MBG.</p>
         </div>
       </div>
       <div class="col-md-6">
-        <div class="p-2 border rounded bg-white">
-          <span class="badge bg-success me-1">🛡️ NON-CYBERBULLYING</span> = Sentimen <b>Positif</b> &amp; <b>Netral</b>
-          <p class="mb-0 mt-1">Komentar berupa dukungan, apresiasi, kepuasan, maupun pertanyaan informatif dan diskusi objektif yang aman.</p>
+        <div class="p-2 border rounded bg-warning-subtle border-warning h-100">
+          <span class="badge bg-warning text-dark me-1">💬 NEGATIF BIASA</span> (Kritik / Keluhan Wajar - Aman)
+          <p class="mb-0 mt-1 text-dark">Komentar negatif berupa <b>komplain rasa, porsi, antrean, atau saran perbaikan</b> TANPA kata makian, hinaan martabat, atau serangan personal (Bukan Cyberbullying).</p>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="p-2 border rounded bg-white border h-100">
+          <span class="badge bg-success me-1">🛡️ POSITIF</span> (Non-Cyberbullying)
+          <p class="mb-0 mt-1">Komentar berupa dukungan, apresiasi, kepuasan, atau antusiasme baik terhadap program MBG.</p>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="p-2 border rounded bg-white border h-100">
+          <span class="badge bg-secondary me-1">ℹ️ NETRAL</span> (Non-Cyberbullying)
+          <p class="mb-0 mt-1">Komentar berupa pertanyaan faktual, informasi objektif, atau pernyataan netral tanpa muatan emosi negatif/positif.</p>
         </div>
       </div>
     </div>
@@ -46,28 +58,37 @@
   <div class="card shadow-sm border-0">
     <div class="card-header bg-white py-3 border-bottom">
       <h4 class="mb-0 fw-bold text-dark"><i class="bi bi-chat-dots-fill text-primary me-2"></i>Prediksi Komentar &amp; Deteksi Cyberbullying</h4>
-      <small class="text-muted">Uji satu komentar baru menggunakan model Naive Bayes dan pembobotan kata TF-IDF</small>
+      <small class="text-muted">Uji satu komentar baru menggunakan model Naive Bayes, TF-IDF, dan deteksi leksikon cyberbullying</small>
     </div>
 
     <div class="card-body p-4">
       <div class="mb-3">
         <label for="text" class="form-label fw-semibold">Masukkan Komentar TikTok:</label>
-        <textarea class="form-control" id="text" rows="4" placeholder="Contoh: Menunya buruk banget, beracun dan bikin muntah! atau Makanannya enak dan bergizi sekali, terima kasih!"></textarea>
+        <textarea class="form-control" id="text" rows="4" placeholder="Tulis komentar..."></textarea>
       </div>
 
-      <div class="d-flex gap-2">
+      <div class="d-flex flex-wrap gap-2 mb-2">
         <button class="btn btn-primary px-4 fw-semibold" id="btnPredict">
           <i class="bi bi-search me-1"></i> Analisis &amp; Prediksi
         </button>
-        <button class="btn btn-outline-secondary" id="btnSamplePos">Contoh Positif</button>
-        <button class="btn btn-outline-secondary" id="btnSampleNeg">Contoh Negatif (Cyberbullying)</button>
-        <button class="btn btn-outline-secondary" id="btnSampleNeu">Contoh Netral</button>
+        <button class="btn btn-outline-danger btn-sm" id="btnSampleCB">
+          <i class="bi bi-exclamation-octagon me-1"></i> Contoh Cyberbullying (Makian)
+        </button>
+        <button class="btn btn-outline-warning btn-sm text-dark" id="btnSampleNegBiasa">
+          <i class="bi bi-chat-square-text me-1"></i> Contoh Negatif Biasa (Kritik Wajar)
+        </button>
+        <button class="btn btn-outline-success btn-sm" id="btnSamplePos">
+          <i class="bi bi-hand-thumbs-up me-1"></i> Contoh Positif
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" id="btnSampleNeu">
+          <i class="bi bi-question-circle me-1"></i> Contoh Netral
+        </button>
       </div>
 
       <div id="loading" class="mt-4" style="display:none">
         <div class="d-flex align-items-center gap-2 text-primary">
           <div class="spinner-border spinner-border-sm"></div>
-          <span>Sedang melakukan preprocessing teks dan menghitung probabilitas Naive Bayes...</span>
+          <span>Sedang melakukan preprocessing teks dan menganalisis klasifikasi sentimen &amp; cyberbullying...</span>
         </div>
       </div>
 
@@ -76,20 +97,27 @@
       <!-- Hasil Prediksi -->
       <div id="resultBox" class="mt-4" style="display:none">
         <hr>
-        <h5 class="fw-bold mb-3 text-secondary">HASIL ANALISIS MODEL</h5>
+        <h5 class="fw-bold mb-3 text-secondary">HASIL ANALISIS KLASIFIKASI &amp; DETEKSI</h5>
 
         <!-- Banner Status Cyberbullying Utama -->
         <div id="cyberbullyingBanner" class="p-4 rounded-3 border mb-4">
           <div class="d-flex align-items-start gap-3">
             <div id="bannerIcon" class="fs-1"></div>
             <div class="flex-grow-1">
-              <div class="d-flex align-items-center gap-2 mb-1">
+              <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                 <span class="fs-4 fw-bold" id="cyberbullyingTitle"></span>
                 <span id="badgeSentimentClass" class="badge fs-6"></span>
               </div>
               <p class="mb-2 fs-6" id="cyberbullyingExplanation"></p>
+              
+              <!-- Indikator Kata Kunci Cyberbullying (Jika Ada) -->
+              <div id="detectedTermsBox" class="mb-2" style="display:none">
+                <span class="small fw-bold text-danger">Kata makian/hinaan yang terdeteksi: </span>
+                <span id="detectedTermsList"></span>
+              </div>
+
               <div class="d-flex flex-wrap gap-3 small text-muted pt-2 border-top">
-                <div>Tingkat Keyakinan (Confidence): <b class="text-dark fs-6" id="confidenceText"></b></div>
+                <div>Keyakinan Model (Confidence): <b class="text-dark fs-6" id="confidenceText"></b></div>
                 <div>Status Akhir: <b class="text-dark" id="statusSummaryText"></b></div>
               </div>
             </div>
@@ -108,7 +136,7 @@
         </div>
 
         <!-- Tabel Probabilitas -->
-        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-bar-chart-fill me-1"></i>Distribusi Probabilitas Kelas (Multinomial Naive Bayes)</h6>
+        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-bar-chart-fill me-1"></i>Distribusi Probabilitas Kelas Sentimen (Multinomial Naive Bayes)</h6>
         <div class="table-responsive">
           <table class="table table-bordered align-middle">
             <thead class="table-light">
@@ -135,8 +163,9 @@
 
 <script>
 function renderPredictionResult(res) {
-    let isCb = (res.is_cyberbullying || res.prediction === "Negatif" || (res.cyberbullying_status || "").toLowerCase().includes("cyberbullying") && !(res.cyberbullying_status || "").toLowerCase().includes("non"));
-    let sentiment = res.prediction || res.sentiment || "Netral";
+    let isCb = res.is_cyberbullying === true;
+    let isOrdNeg = res.is_ordinary_negative === true || (res.prediction === "Negatif" && !isCb);
+    let sentiment = res.prediction || "Netral";
 
     let banner = $("#cyberbullyingBanner");
     let icon = $("#bannerIcon");
@@ -144,31 +173,51 @@ function renderPredictionResult(res) {
     let explanation = $("#cyberbullyingExplanation");
     let badgeSent = $("#badgeSentimentClass");
     let statusSummary = $("#statusSummaryText");
+    let detectedBox = $("#detectedTermsBox");
+    let detectedList = $("#detectedTermsList");
 
     // Reset kelas banner
-    banner.removeClass("alert-danger alert-success alert-secondary border-danger border-success border-secondary bg-danger-subtle bg-success-subtle bg-light");
+    banner.removeClass("alert-danger alert-warning alert-success alert-secondary border-danger border-warning border-success border-secondary bg-danger-subtle bg-warning-subtle bg-success-subtle bg-light");
 
     if (isCb) {
         banner.addClass("alert-danger border-danger");
         icon.html('<i class="bi bi-exclamation-octagon-fill text-danger"></i>');
         title.html('<span class="text-danger">🚨 TERDETEKSI CYBERBULLYING</span>');
-        badgeSent.removeClass().addClass("badge bg-danger").text("Sentimen: NEGATIF");
-        explanation.text(res.explanation || "Komentar ini teridentifikasi sebagai Sentimen Negatif yang dikategorikan sebagai CYBERBULLYING (memuat ujaran kebencian, cemoohan, atau serangan verbal terhadap program MBG).");
-        statusSummary.html('<span class="text-danger fw-bold">CYBERBULLYING (Perlu Moderasi)</span>');
+        badgeSent.removeClass().addClass("badge bg-danger").text("Sentimen: NEGATIF (Cyberbullying)");
+        explanation.text(res.explanation);
+        statusSummary.html('<span class="text-danger fw-bold">🚨 Cyberbullying (Perlu Moderasi / Tindakan)</span>');
+
+        if (res.detected_terms && res.detected_terms.length > 0) {
+            let termsBadges = res.detected_terms.map(t => "<span class='badge bg-danger me-1'>" + t + "</span>").join(" ");
+            detectedList.html(termsBadges);
+            detectedBox.show();
+        } else {
+            detectedBox.hide();
+        }
+    } else if (isOrdNeg) {
+        banner.addClass("alert-warning border-warning");
+        icon.html('<i class="bi bi-chat-square-text-fill text-warning"></i>');
+        title.html('<span class="text-dark">💬 KOMENTAR NEGATIF BIASA (BUKAN CYBERBULLYING)</span>');
+        badgeSent.removeClass().addClass("badge bg-warning text-dark").text("Sentimen: NEGATIF (Kritik Wajar)");
+        explanation.text(res.explanation);
+        statusSummary.html('<span class="text-warning-emphasis fw-bold">💬 Negatif Biasa (Kritik / Keluhan Wajar - Aman)</span>');
+        detectedBox.hide();
     } else if (sentiment === "Positif") {
         banner.addClass("alert-success border-success");
         icon.html('<i class="bi bi-shield-check text-success"></i>');
-        title.html('<span class="text-success">🛡️ NON-CYBERBULLYING (Aman)</span>');
+        title.html('<span class="text-success">🛡️ NON-CYBERBULLYING (Sentimen Positif)</span>');
         badgeSent.removeClass().addClass("badge bg-success").text("Sentimen: POSITIF");
-        explanation.text(res.explanation || "Komentar ini teridentifikasi sebagai Sentimen Positif yang dikategorikan sebagai NON-CYBERBULLYING (memuat apresiasi atau dukungan positif).");
-        statusSummary.html('<span class="text-success fw-bold">NON-CYBERBULLYING (Aman / Positif)</span>');
+        explanation.text(res.explanation);
+        statusSummary.html('<span class="text-success fw-bold">🛡️ Non-Cyberbullying (Apresiasi / Positif)</span>');
+        detectedBox.hide();
     } else {
         banner.addClass("alert-secondary border-secondary");
-        icon.html('<i class="bi bi-shield-check text-secondary"></i>');
-        title.html('<span class="text-secondary">🛡️ NON-CYBERBULLYING (Netral)</span>');
+        icon.html('<i class="bi bi-info-circle-fill text-secondary"></i>');
+        title.html('<span class="text-secondary">ℹ️ NON-CYBERBULLYING (Sentimen Netral)</span>');
         badgeSent.removeClass().addClass("badge bg-secondary").text("Sentimen: NETRAL");
-        explanation.text(res.explanation || "Komentar ini teridentifikasi sebagai Sentimen Netral yang dikategorikan sebagai NON-CYBERBULLYING (memuat pertanyaan objektif atau fakta tanpa unsur perundungan).");
-        statusSummary.html('<span class="text-secondary fw-bold">NON-CYBERBULLYING (Aman / Netral)</span>');
+        explanation.text(res.explanation);
+        statusSummary.html('<span class="text-secondary fw-bold">ℹ️ Non-Cyberbullying (Informasi / Netral)</span>');
+        detectedBox.hide();
     }
 
     $("#preprocessedText").text(res.preprocessing || "-");
@@ -180,12 +229,23 @@ function renderPredictionResult(res) {
     Object.keys(probs).forEach(function (label) {
         let prob = probs[label];
         let pct = (prob * 100).toFixed(2);
-        let cbStatus = (label === "Negatif") ? "<span class='badge bg-danger'>Cyberbullying</span>" : "<span class='badge bg-success'>Non-Cyberbullying</span>";
-        let barColor = (label === "Negatif") ? "bg-danger" : (label === "Positif" ? "bg-success" : "bg-warning");
+        let cbDesc = "";
+        let barColor = "bg-secondary";
+
+        if (label === "Negatif") {
+            cbDesc = "<span class='badge bg-danger me-1'>Cyberbullying</span> / <span class='badge bg-warning text-dark'>Negatif Biasa</span>";
+            barColor = isCb ? "bg-danger" : "bg-warning";
+        } else if (label === "Positif") {
+            cbDesc = "<span class='badge bg-success'>Non-Cyberbullying</span>";
+            barColor = "bg-success";
+        } else {
+            cbDesc = "<span class='badge bg-secondary'>Non-Cyberbullying</span>";
+            barColor = "bg-secondary";
+        }
 
         rows += "<tr>";
         rows += "<td><b>" + label + "</b></td>";
-        rows += "<td>" + cbStatus + "</td>";
+        rows += "<td>" + cbDesc + "</td>";
         rows += "<td><span class='fw-semibold'>" + pct + "%</span> <small class='text-muted'>(" + prob + ")</small></td>";
         rows += "<td>";
         rows += "  <div class='progress' style='height: 18px;'>";
@@ -199,7 +259,7 @@ function renderPredictionResult(res) {
     $("#resultBox").show();
 }
 
-$("#btnPredict").click(function () {
+$("#btnPredict").off("click").on("click", function () {
     let text = $("#text").val().trim();
     $("#alertBox").hide();
     $("#resultBox").hide();
@@ -232,14 +292,20 @@ $("#btnPredict").click(function () {
 });
 
 // Tombol Contoh Uji Cepat
-$("#btnSamplePos").click(function () {
-    $("#text").val("Alhamdulillah menu MBG di sekolah anakku sangat bergizi dan enak sekali, anak jadi semangat sekolah!");
+$("#btnSampleCB").off("click").on("click", function () {
+    $("#text").val("Dasar program MBG tolol busuk beracun korupsi, menu kayak sampah najis mampus lu!");
 });
-$("#btnSampleNeg").click(function () {
-    $("#text").val("Dasar program MBG tolol busuk beracun, menu kayak sampah gini dikorupsi semua duitnya!");
+
+$("#btnSampleNegBiasa").off("click").on("click", function () {
+    $("#text").val("Makanannya kurang asin dan sayurnya dingin banget, tolong porsi nasi dan ayamnya ditambah ya.");
 });
-$("#btnSampleNeu").click(function () {
-    $("#text").val("Apakah program MBG ini sudah berlaku di semua sekolah dasar di Jawa Barat?");
+
+$("#btnSamplePos").off("click").on("click", function () {
+    $("#text").val("Alhamdulillah menu MBG hari ini enak banget dan sangat bergizi, terima kasih banyak atas kerja keras tim dapur!");
+});
+
+$("#btnSampleNeu").off("click").on("click", function () {
+    $("#text").val("Apakah program MBG ini sudah berlaku serentak di seluruh sekolah dasar di Jawa Barat?");
 });
 </script>
 
